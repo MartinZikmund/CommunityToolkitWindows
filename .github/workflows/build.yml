@@ -54,7 +54,7 @@ jobs:
       - name: Check XAML Styling
         run: powershell -version 5.1 -command "./ApplyXamlStyling.ps1 -Passive" -ErrorAction Stop
 
-  # Build both Uno.UI/WinUI2/UWP and Uno.WinUI/WinUI3/WindowsAppSDK versions of our packages using a matrix
+  # Build both WinUI 2 (native UWP only) and WinUI 3 (WinAppSDK + Uno) versions of our packages using a matrix
   build:
     needs: [Xaml-Style-Check]
     runs-on: windows-2022
@@ -67,12 +67,20 @@ jobs:
       fail-fast: false # prevent one matrix pipeline from being cancelled if one fails, we want them all to run to completion.
       matrix:
         winui: [2, 3]
-        multitarget: ['uwp', 'wasdk', 'wasm', 'wpf', 'linuxgtk', 'macos', 'ios', 'android']
+        multitarget: ['uwp', 'wasdk', 'wasm', 'macos', 'ios', 'android']
         exclude:
-          # WinUI 2 not supported on wasdk
+          # WinUI 2 only builds native UWP (Uno.UI dropped in Uno 6)
           - winui: 2
             multitarget: wasdk
-          # WinUI 3 not supported on uwp
+          - winui: 2
+            multitarget: wasm
+          - winui: 2
+            multitarget: macos
+          - winui: 2
+            multitarget: ios
+          - winui: 2
+            multitarget: android
+          # WinUI 3 excludes UWP
           - winui: 3
             multitarget: uwp
 
@@ -112,7 +120,7 @@ jobs:
         run: dotnet tool restore
 
       - name: Run Uno Check to Install Dependencies
-        if: ${{ matrix.multitarget != 'wasdk' && matrix.multitarget != 'linuxgtk' && matrix.multitarget != 'wpf' }}
+        if: ${{ matrix.multitarget != 'wasdk' }}
         run: >
           dotnet tool run uno-check 
           --ci
@@ -281,7 +289,7 @@ jobs:
       - name: Define excluded MultiTargets (WinUI 2)
         if: ${{ matrix.winui == '2' }}
         run: |
-          echo "EXCLUDED_MULTITARGETS=wasdk" >> $env:GITHUB_ENV
+          echo "EXCLUDED_MULTITARGETS=wasdk,wasm,macos,ios,android" >> $env:GITHUB_ENV
 
       - name: Define excluded MultiTargets (WinUI 3)
         if: ${{ matrix.winui == '3' }}
