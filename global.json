@@ -6,6 +6,7 @@
   },
   "msbuild-sdks":
   {
-    "MSBuild.Sdk.Extras":"3.0.23"
+    "MSBuild.Sdk.Extras":"3.0.23",
+    "Uno.Sdk": "6.0.465"
   }
 }
