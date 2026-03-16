@@ -67,7 +67,7 @@ jobs:
       fail-fast: false # prevent one matrix pipeline from being cancelled if one fails, we want them all to run to completion.
       matrix:
         winui: [2, 3]
-        multitarget: ['uwp', 'wasdk', 'wasm', 'wpf', 'linuxgtk', 'macos', 'ios', 'android']
+        multitarget: ['uwp', 'wasdk', 'wasm', 'wpf', 'linuxgtk', 'macos', 'ios', 'android', 'unosdk']
         exclude:
           # WinUI 2 not supported on wasdk
           - winui: 2
@@ -75,6 +75,14 @@ jobs:
           # WinUI 3 not supported on uwp
           - winui: 3
             multitarget: uwp
+          # Uno SDK is WinUI 3 only
+          - winui: 2
+            multitarget: unosdk
+          # WinUI 3 dropped wpf and linuxgtk backends
+          - winui: 3
+            multitarget: wpf
+          - winui: 3
+            multitarget: linuxgtk
 
     # Steps represent a sequence of tasks that will be executed as part of the job
     steps:
@@ -116,7 +124,7 @@ jobs:
         run: >
           dotnet tool run uno-check 
           --ci
-          --target ${{ matrix.multitarget }}
+          --target ${{ matrix.multitarget == 'unosdk' && 'wasm' || matrix.multitarget }}
           --fix
           --non-interactive
           --skip wsl
@@ -133,10 +141,11 @@ jobs:
       # Generate full solution with all projects (sample gallery heads, components, tests)
       - name: Generate solution with ${{ matrix.multitarget }} gallery, components and tests
         working-directory: ./
-        run: powershell -version 5.1 -command "./tooling/GenerateAllSolution.ps1 -MultiTargets ${{ matrix.multitarget }} ${{ env.ENABLE_DIAGNOSTICS == 'true' && ' -UseDiagnostics' || '' }} -WinUIMajorVersion ${{ matrix.winui }}" -ErrorAction Stop
+        run: powershell -version 5.1 -command "./tooling/GenerateAllSolution.ps1 -MultiTargets ${{ matrix.multitarget == 'unosdk' && 'wasm' || matrix.multitarget }} ${{ matrix.multitarget == 'unosdk' && '-IncludeUnoSdkHead' || '' }} ${{ env.ENABLE_DIAGNOSTICS == 'true' && ' -UseDiagnostics' || '' }} -WinUIMajorVersion ${{ matrix.winui }}" -ErrorAction Stop
 
       # Build solution
       - name: MSBuild
+        if: ${{ matrix.multitarget != 'unosdk' }}
         run: >
           msbuild.exe /restore /nowarn:MSB4011
           /p:Configuration=Release
@@ -144,6 +153,11 @@ jobs:
           ${{ env.ENABLE_DIAGNOSTICS == 'true' && '/bl' || '' }}
           /v:${{ env.MSBUILD_VERBOSITY }}
           CommunityToolkit.AllComponents.sln
+
+      - name: Build Uno head
+        if: ${{ matrix.multitarget == 'unosdk' }}
+        working-directory: ./${{ env.HEADS_DIRECTORY }}/AllComponents/Uno/
+        run: dotnet build /r /bl -f net9.0-browserwasm -v:${{ env.MSBUILD_VERBOSITY }}
 
       # Run tests
       - name: Setup VSTest Path
@@ -286,7 +300,7 @@ jobs:
       - name: Define excluded MultiTargets (WinUI 3)
         if: ${{ matrix.winui == '3' }}
         run: |
-          echo "EXCLUDED_MULTITARGETS=uwp" >> $env:GITHUB_ENV
+          echo "EXCLUDED_MULTITARGETS=uwp;wpf;linuxgtk" >> $env:GITHUB_ENV
 
       # Build and pack component nupkg
       - name: Build and pack component packages
@@ -447,24 +461,18 @@ jobs:
       - name: Restore dotnet tools
         run: dotnet tool restore
 
-      - name: Enable WASM TargetFrameworks
-        shell: pwsh
-        working-directory: ./${{ env.MULTI_TARGET_DIRECTORY }}
-        run: ./UseTargetFrameworks.ps1 wasm
-
       - name: Generate solution
         shell: pwsh
         working-directory: ./
-        run: ./tooling/GenerateAllSolution.ps1${{ env.ENABLE_DIAGNOSTICS == 'true' && ' -UseDiagnostics' || '' }}
+        run: ./tooling/GenerateAllSolution.ps1 -IncludeUnoSdkHead -MultiTargets wasm${{ env.ENABLE_DIAGNOSTICS == 'true' && ' -UseDiagnostics' || '' }}
 
       - name: Install ninja for WASM native dependencies
         run: sudo apt-get install ninja-build
 
-      # Issue with Comment Links currently, see: https://github.com/mrlacey/CommentLinks/issues/38
-      # See launch.json configuration file for analogous command we're emulating here to build LINK: ../../.vscode/launch.json:CommunityToolkit.App.Wasm.csproj
       - name: dotnet build
-        working-directory: ./${{ env.HEADS_DIRECTORY }}/AllComponents/Wasm/
-        run: dotnet build /r /bl -v:${{ env.MSBUILD_VERBOSITY }}
+        shell: pwsh
+        working-directory: ./${{ env.HEADS_DIRECTORY }}/AllComponents/Uno/
+        run: dotnet build /r /bl -f net9.0-browserwasm -v:${{ env.MSBUILD_VERBOSITY }}
   
       # TODO: Do we want to run tests here? Can we do that on linux easily?
 

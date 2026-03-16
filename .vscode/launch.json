@@ -22,6 +22,26 @@
       "preLaunchTask": "generateAllSolution"
     },
     {
+      "name": "All samples app (Uno.Sdk)",
+      "type": "coreclr",
+      "request": "launch",
+      "program": "dotnet",
+      "args": [
+        "build",
+        "/r",
+        "/bl",
+        "-f",
+        "net9.0-browserwasm",
+        "--project=${workspaceFolder}/tooling/ProjectHeads/AllComponents/Uno/CommunityToolkit.App.Uno.csproj"
+      ],
+      "presentation": {
+        "group": "1",
+        "order": 2
+      },
+      "cwd": "${workspaceFolder}/tooling/ProjectHeads/AllComponents/Uno",
+      "preLaunchTask": "generateAllSolution"
+    },
+    {
       "type": "PowerShell",
       "request": "launch",
       "name": "Discover samples",
