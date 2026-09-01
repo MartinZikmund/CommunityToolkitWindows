@@ -67,7 +67,7 @@ jobs:
       fail-fast: false # prevent one matrix pipeline from being cancelled if one fails, we want them all to run to completion.
       matrix:
         winui: [2, 3]
-        multitarget: ['uwp', 'wasdk', 'wasm', 'unosdk', 'wpf', 'linuxgtk', 'macos', 'ios', 'android']
+        multitarget: ['uwp', 'wasdk', 'wasm', 'wpf', 'win32', 'linux', 'macos', 'ios', 'android']
         exclude:
           # WinUI 2 not supported on wasdk
           - winui: 2
@@ -75,12 +75,18 @@ jobs:
           # WinUI 3 not supported on uwp
           - winui: 3
             multitarget: uwp
-          # WinUI 3 wasm is covered by the Uno.Sdk head (unosdk)
+          # wpf is the Uno 5 Skia WPF head, which Uno 6 replaced with win32
+          - winui: 3
+            multitarget: wpf
+          # win32 is the Uno 6 Skia desktop head, which has no Uno 5 equivalent
+          - winui: 2
+            multitarget: win32
+        include:
+          # On WinUI 3 the Uno.Sdk head replaces the classic Wasm head, so it rides on the
+          # existing wasm job as a flag rather than a fake entry in the multitarget axis.
           - winui: 3
             multitarget: wasm
-          # Uno.Sdk head is WinUI 3 only
-          - winui: 2
-            multitarget: unosdk
+            unoSdkHead: true
 
     # Steps represent a sequence of tasks that will be executed as part of the job
     steps:
@@ -118,7 +124,7 @@ jobs:
         run: dotnet tool restore
 
       - name: Run Uno Check to Install Dependencies
-        if: ${{ matrix.multitarget != 'wasdk' && matrix.multitarget != 'linuxgtk' && matrix.multitarget != 'wpf' && matrix.multitarget != 'unosdk' }}
+        if: ${{ matrix.multitarget != 'wasdk' && matrix.multitarget != 'linux' && matrix.multitarget != 'wpf' && matrix.multitarget != 'win32' && !matrix.unoSdkHead }}
         run: >
           dotnet tool run uno-check
           --ci
@@ -134,7 +140,7 @@ jobs:
       # The Uno.Sdk head builds desktop/browserwasm/android (iOS is filtered on
       # Windows). Install the matching workloads directly instead of uno-check.
       - name: Install .NET workloads (Uno.Sdk head)
-        if: ${{ matrix.multitarget == 'unosdk' }}
+        if: ${{ matrix.unoSdkHead }}
         run: dotnet workload install wasm-tools android ios maui
 
       - name: Add msbuild to PATH
@@ -143,20 +149,14 @@ jobs:
           vs-version: '[17.9,)'
 
       # Generate full solution with all projects (sample gallery heads, components, tests)
+      # The Uno.Sdk head also covers Windows desktop, so it asks for win32 alongside wasm.
       - name: Generate solution with ${{ matrix.multitarget }} gallery, components and tests
-        if: ${{ matrix.multitarget != 'unosdk' }}
         working-directory: ./
-        run: powershell -version 5.1 -command "./tooling/GenerateAllSolution.ps1 -MultiTargets ${{ matrix.multitarget }} ${{ env.ENABLE_DIAGNOSTICS == 'true' && ' -UseDiagnostics' || '' }} -WinUIMajorVersion ${{ matrix.winui }}" -ErrorAction Stop
-
-      # The Uno.Sdk head covers wasm (browserwasm) for WinUI 3; generate with it included
-      - name: Generate solution with Uno.Sdk gallery, components and tests
-        if: ${{ matrix.multitarget == 'unosdk' }}
-        working-directory: ./
-        run: powershell -version 5.1 -command "./tooling/GenerateAllSolution.ps1 -MultiTargets wasm -IncludeUnoSdkHead -WinUIMajorVersion 3${{ env.ENABLE_DIAGNOSTICS == 'true' && ' -UseDiagnostics' || '' }}" -ErrorAction Stop
+        run: powershell -version 5.1 -command "./tooling/GenerateAllSolution.ps1 -MultiTargets ${{ matrix.multitarget }}${{ matrix.unoSdkHead && ',win32 -IncludeUnoSdkHead' || '' }} ${{ env.ENABLE_DIAGNOSTICS == 'true' && ' -UseDiagnostics' || '' }} -WinUIMajorVersion ${{ matrix.winui }}" -ErrorAction Stop
 
       # Build solution
       - name: MSBuild
-        if: ${{ matrix.multitarget != 'unosdk' }}
+        if: ${{ !matrix.unoSdkHead }}
         run: >
           msbuild.exe /restore /nowarn:MSB4011
           /p:Configuration=Release
@@ -168,7 +168,7 @@ jobs:
       # The Uno.Sdk head is a single project covering desktop/browserwasm/android
       # (iOS is filtered on Windows); build it directly with dotnet.
       - name: Build Uno.Sdk head
-        if: ${{ matrix.multitarget == 'unosdk' }}
+        if: ${{ matrix.unoSdkHead }}
         run: dotnet build tooling/ProjectHeads/AllComponents/Uno/CommunityToolkit.App.Uno.csproj -p:Configuration=Release ${{ env.ENABLE_DIAGNOSTICS == 'true' && '/bl' || '' }}
 
       # Run tests
@@ -483,7 +483,7 @@ jobs:
       - name: Generate solution
         shell: pwsh
         working-directory: ./
-        run: ./tooling/GenerateAllSolution.ps1 -MultiTargets wasm -IncludeUnoSdkHead -WinUIMajorVersion 3${{ env.ENABLE_DIAGNOSTICS == 'true' && ' -UseDiagnostics' || '' }}
+        run: ./tooling/GenerateAllSolution.ps1 -MultiTargets wasm,linux -IncludeUnoSdkHead -WinUIMajorVersion 3${{ env.ENABLE_DIAGNOSTICS == 'true' && ' -UseDiagnostics' || '' }}
 
       - name: Build Uno head (browserwasm)
         shell: pwsh
