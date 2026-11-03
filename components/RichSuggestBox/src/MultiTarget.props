@@ -6,4 +6,8 @@
         -->
         <MultiTarget>uwp;wasdk;wpf;win32;wasm;linux;macos;ios;android;</MultiTarget>
     </PropertyGroup>
+    <!-- On Uno 5 Apple targets controls are UIViews, whose Window, Paste and Description clash with RichSuggestBox members -->
+    <PropertyGroup Condition="'$(WinUIMajorVersion)' == '2'">
+        <MultiTarget>uwp;wpf;wasm;linux;android;</MultiTarget>
+    </PropertyGroup>
 </Project>
