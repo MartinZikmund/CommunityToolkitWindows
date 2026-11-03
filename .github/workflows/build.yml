@@ -190,7 +190,10 @@ jobs:
       # (iOS is filtered on Windows); build it directly with dotnet.
       - name: Build Uno.Sdk head
         if: ${{ matrix.unoSdkHead }}
-        run: dotnet build tooling/ProjectHeads/AllComponents/Uno/CommunityToolkit.App.Uno.csproj -p:Configuration=Release ${{ env.ENABLE_DIAGNOSTICS == 'true' && '/bl' || '' }}
+        run: |
+          dotnet build tooling/ProjectHeads/AllComponents/Uno/CommunityToolkit.App.Uno.csproj -p:Configuration=Release ${{ env.ENABLE_DIAGNOSTICS == 'true' && '/bl' || '' }}
+          if ($LASTEXITCODE) { exit $LASTEXITCODE }
+          dotnet build tooling/CommunityToolkit.Tooling.SampleGen.Tests/CommunityToolkit.Tooling.SampleGen.Tests.csproj -p:Configuration=Release
 
       # Run tests
       - name: Setup VSTest Path
