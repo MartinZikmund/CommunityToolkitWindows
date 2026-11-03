@@ -27,7 +27,7 @@ public partial class RichSuggestBox
         // https://github.com/microsoft/microsoft-ui-xaml/issues/4228
         // TODO: Remove when DisplayInformation.ScreenHeightInRawPixels alternative is available
 #if !WINAPPSDK
-        var window = Window.Current;
+        var window = global::Windows.UI.Xaml.Window.Current;
         if (CoreWindow.GetForCurrentThread() == null || window == null)
         {
             return true;

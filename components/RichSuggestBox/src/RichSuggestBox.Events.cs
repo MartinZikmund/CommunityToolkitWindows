@@ -43,5 +43,5 @@ public partial class RichSuggestBox
     /// <summary>
     /// Event raised when text is pasted into the control.
     /// </summary>
-    public event TypedEventHandler<RichSuggestBox, TextControlPasteEventArgs> Paste;
+    public new event TypedEventHandler<RichSuggestBox, TextControlPasteEventArgs> Paste;
 }
